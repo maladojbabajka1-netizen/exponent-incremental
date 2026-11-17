@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "EXPONENT - An incremental game",
+  "main": "electron.js",
   "scripts": {
     "build": "echo Building EXPONENT",
     "cap:sync": "cap sync",
