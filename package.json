@@ -1,0 +1,17 @@
+{
+  "name": "exponent-incremental",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EXPONENT - An incremental game",
+  "scripts": {
+    "build": "echo Building EXPONENT",
+    "cap:init": "cap init EXPONENT com.exponent.incremental",
+    "cap:sync": "cap sync"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.4.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.3"
+  }
+}
