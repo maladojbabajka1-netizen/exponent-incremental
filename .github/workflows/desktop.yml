@@ -1,0 +1,43 @@
+
+name: EXPONENT Desktop Builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: macos
+          - os: ubuntu-latest
+            platform: linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build desktop app
+        run: npm run package:desktop
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: EXPONENT-${{ matrix.platform }}
+          path: dist/*
+          
