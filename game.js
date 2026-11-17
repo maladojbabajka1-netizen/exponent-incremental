@@ -1,5 +1,5 @@
 
-const SAVE_KEY = "exponent_save_v2";
+const SAVE_KEY = "exponent_save_v3";
 
 const ERAS = [
   {
@@ -31,7 +31,7 @@ const ERAS = [
     name: "Quantum",
     color: "#c084fc",
     generatorCost: 50,
-    generatorGrowth: 1.2,
+    generatorGrowth: 1.20,
     generatorPower: 5,
     upgradeCost: 300,
     upgradePower: 4,
@@ -77,8 +77,10 @@ function createDefaultSave() {
     unlocked: ["energy"],
     upgrades: [],
     lifetime: {},
+    runLifetime: {},
     totalClicks: 0,
     prestigeCount: 0,
+    prestigePoints: 0,
     evilPrestigeCount: 0
   };
 }
@@ -88,14 +90,15 @@ let currentTab = "main";
 
 function format(value) {
   if (!Number.isFinite(value)) return "Infinity";
-  if (value < 1000) return value.toFixed(0);
+  if (value < 1000) return Math.floor(value).toString();
 
   if (value >= 1e15) {
     return value.toExponential(2);
   }
 
   const suffixes = [
-    "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp"
+    "K", "M", "B", "T",
+    "Qa", "Qi", "Sx", "Sp"
   ];
 
   let tier = -1;
@@ -110,34 +113,46 @@ function format(value) {
   return value.toFixed(2) + suffixes[tier];
 }
 
+// SAVE SYSTEM
+
 function loadGame() {
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
 
     if (!saved) return;
 
-    if (saved.currencies && saved.unlocked) {
-      game = {
-        ...createDefaultSave(),
-        ...saved,
-        currencies: {
-          ...createDefaultSave().currencies,
-          ...saved.currencies
-        },
-        generators: {
-          ...createDefaultSave().generators,
-          ...saved.generators
-        }
-      };
-    }
+    const defaults = createDefaultSave();
+
+    game = {
+      ...defaults,
+      ...saved,
+      currencies: {
+        ...defaults.currencies,
+        ...(saved.currencies || {})
+      },
+      generators: {
+        ...defaults.generators,
+        ...(saved.generators || {})
+      },
+      lifetime: saved.lifetime || {},
+      runLifetime: saved.runLifetime || {},
+      unlocked: saved.unlocked || ["energy"],
+      upgrades: saved.upgrades || []
+    };
+
   } catch (error) {
     console.log("Could not load save.");
   }
 }
 
 function saveGame() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify(game));
+  localStorage.setItem(
+    SAVE_KEY,
+    JSON.stringify(game)
+  );
 }
+
+// CURRENCY SYSTEM
 
 function getActiveEra() {
   return [...ERAS].reverse().find(
@@ -151,10 +166,15 @@ function getMultiplier(era) {
     : 1;
 }
 
+function getPrestigeMultiplier() {
+  return 1 + game.prestigePoints * 0.1;
+}
+
 function getProduction(era) {
   return game.generators[era.id] *
     era.generatorPower *
-    getMultiplier(era);
+    getMultiplier(era) *
+    getPrestigeMultiplier();
 }
 
 function earnCurrency(id, amount) {
@@ -162,30 +182,26 @@ function earnCurrency(id, amount) {
 
   game.lifetime[id] =
     (game.lifetime[id] || 0) + amount;
+
+  game.runLifetime[id] =
+    (game.runLifetime[id] || 0) + amount;
 }
 
 function generateEnergy() {
   const era = getActiveEra();
 
-  earnCurrency(era.id, getMultiplier(era));
+  earnCurrency(
+    era.id,
+    getMultiplier(era) * getPrestigeMultiplier()
+  );
+
   game.totalClicks++;
 
   updateUI();
   saveGame();
 }
 
-function buyGenerator(id) {
-  const era = ERAS.find(item => item.id === id);
-  const cost = getGeneratorCost(era);
-
-  if (!era || game.currencies[id] < cost) return;
-
-  game.currencies[id] -= cost;
-  game.generators[id]++;
-
-  updateUI();
-  saveGame();
-}
+// GENERATORS
 
 function getGeneratorCost(era) {
   return Math.ceil(
@@ -197,8 +213,27 @@ function getGeneratorCost(era) {
   );
 }
 
+function buyGenerator(id) {
+  const era = ERAS.find(item => item.id === id);
+
+  if (!era) return;
+
+  const cost = getGeneratorCost(era);
+
+  if (game.currencies[id] < cost) return;
+
+  game.currencies[id] -= cost;
+  game.generators[id]++;
+
+  updateUI();
+  saveGame();
+}
+
+// UPGRADES
+
 function buyUpgrade(id) {
   const era = ERAS.find(item => item.id === id);
+
   if (!era) return;
 
   const upgradeId = id + "_boost";
@@ -213,6 +248,8 @@ function buyUpgrade(id) {
   saveGame();
 }
 
+// CURRENCY MILESTONES
+
 function unlockEra(id) {
   const index = ERAS.findIndex(item => item.id === id);
   const era = ERAS[index];
@@ -220,18 +257,63 @@ function unlockEra(id) {
   if (!era || !era.nextName) return;
 
   const nextEra = ERAS[index + 1];
-  const unlockId = id + "_milestone";
 
+  if (!nextEra) return;
   if (game.unlocked.includes(nextEra.id)) return;
   if (game.currencies[id] < era.nextCost) return;
 
   game.currencies[id] -= era.nextCost;
-  game.upgrades.push(unlockId);
+
+  game.upgrades.push(id + "_milestone");
   game.unlocked.push(nextEra.id);
 
   updateUI();
   saveGame();
 }
+
+// PRESTIGE SYSTEM
+
+function getPrestigeReward() {
+  const lifetimeEnergy = game.runLifetime.energy || 0;
+
+  return Math.floor(
+    Math.sqrt(lifetimeEnergy / 1000000)
+  );
+}
+
+function canPrestige() {
+  return getPrestigeReward() >= 1;
+}
+
+function doPrestige() {
+  if (!canPrestige()) return;
+
+  const reward = getPrestigeReward();
+
+  const lifetime = { ...game.lifetime };
+  const totalClicks = game.totalClicks;
+  const prestigePoints = game.prestigePoints + reward;
+  const prestigeCount = game.prestigeCount + 1;
+  const evilPrestigeCount = game.evilPrestigeCount;
+
+  const fresh = createDefaultSave();
+
+  game = {
+    ...fresh,
+    lifetime,
+    totalClicks,
+    prestigePoints,
+    prestigeCount,
+    evilPrestigeCount
+  };
+
+  currentTab = "prestige";
+
+  updateUI();
+  saveGame();
+}
+
+// INTERFACE
 
 function renderCurrencyHeader() {
   const era = getActiveEra();
@@ -252,10 +334,13 @@ function renderCurrencyHeader() {
 function renderMain(content) {
   content.innerHTML = `
     <h2>Universe Overview</h2>
-    <p>Your universe is expanding. Keep upgrading to discover new currencies.</p>
+
+    <p>Your universe is expanding. Discover new currencies
+    and build increasingly powerful generators.</p>
+
     <br>
     <h3>Unlocked Currencies</h3>
-    <br>
+
     ${ERAS.filter(era => game.unlocked.includes(era.id))
       .map(era => `
         <div class="upgrade-card">
@@ -273,7 +358,8 @@ function renderMain(content) {
 function renderGenerators(content) {
   content.innerHTML = `
     <h2>Generators</h2>
-    <p>Generators automatically produce their own currency.</p>
+    <p>Build generators to produce currencies automatically.</p>
+
     ${ERAS.filter(era => game.unlocked.includes(era.id))
       .map(era => {
         const cost = getGeneratorCost(era);
@@ -283,11 +369,19 @@ function renderGenerators(content) {
             <h3 style="color:${era.color}">
               ${era.name} Generator
             </h3>
+
             <p>Owned: ${game.generators[era.id]}</p>
-            <p>Produces ${format(
-              era.generatorPower * getMultiplier(era)
-            )} ${era.name}/second</p>
+
+            <p>Produces:
+              ${format(
+                era.generatorPower *
+                getMultiplier(era) *
+                getPrestigeMultiplier()
+              )} ${era.name}/second
+            </p>
+
             <p>Cost: ${format(cost)} ${era.name}</p>
+
             <button
               data-generator="${era.id}"
               ${game.currencies[era.id] < cost ? "disabled" : ""}>
@@ -308,13 +402,14 @@ function renderGenerators(content) {
 function renderUpgrades(content) {
   content.innerHTML = `
     <h2>Upgrade Center</h2>
-    <p>Improve your production and unlock new dimensions.</p>
+    <p>Improve your production and discover new currencies.</p>
+
     ${ERAS.filter(era => game.unlocked.includes(era.id))
       .map((era, index) => {
         const upgradeId = era.id + "_boost";
-        const milestoneId = era.id + "_milestone";
         const purchased = game.upgrades.includes(upgradeId);
         const nextEra = ERAS[index + 1];
+
         const nextUnlocked = nextEra &&
           game.unlocked.includes(nextEra.id);
 
@@ -323,9 +418,12 @@ function renderUpgrades(content) {
             <h3 style="color:${era.color}">
               ${era.name} Optimization
             </h3>
+
             <p>Multiply ${era.name} production by x${era.upgradePower}.</p>
             <p>Cost: ${format(era.upgradeCost)} ${era.name}</p>
-            <button data-upgrade="${era.id}"
+
+            <button
+              data-upgrade="${era.id}"
               ${purchased || game.currencies[era.id] < era.upgradeCost ? "disabled" : ""}>
               ${purchased ? "PURCHASED" : "BUY UPGRADE"}
             </button>
@@ -334,9 +432,12 @@ function renderUpgrades(content) {
           ${era.nextName ? `
             <div class="upgrade-card">
               <h3>Milestone: ${era.nextName} Discovery</h3>
-              <p>Unlock the ${era.nextName} currency and its generators.</p>
+
+              <p>Unlock ${era.nextName} and its generators.</p>
               <p>Cost: ${format(era.nextCost)} ${era.name}</p>
-              <button data-milestone="${era.id}"
+
+              <button
+                data-milestone="${era.id}"
                 ${nextUnlocked || game.currencies[era.id] < era.nextCost ? "disabled" : ""}>
                 ${nextUnlocked ? "UNLOCKED" : "DISCOVER " + era.nextName.toUpperCase()}
               </button>
@@ -360,35 +461,72 @@ function renderUpgrades(content) {
 }
 
 function renderPrestige(content) {
+  const reward = getPrestigeReward();
+
   content.innerHTML = `
     <h2>Prestige</h2>
-    <p>Prestige systems will become available as the universe grows.</p>
-    <br>
+
     <div class="upgrade-card">
       <h3>Normal Prestige</h3>
-      <p>Prestige count: ${game.prestigeCount}</p>
-      <p>Permanent bonuses and a new progression layer are planned.</p>
-      <button disabled>COMING SOON</button>
+
+      <p>Prestige Points: ${format(game.prestigePoints)}</p>
+
+      <p>Permanent production multiplier:
+        x${getPrestigeMultiplier().toFixed(2)}
+      </p>
+
+      <p>Run lifetime Energy:
+        ${format(game.runLifetime.energy || 0)}
+      </p>
+
+      <p>Required: 1,000,000 lifetime Energy</p>
+
+      <p>Available reward:
+        ${format(reward)} Prestige Points
+      </p>
+
+      <button
+        id="prestigeButton"
+        ${canPrestige() ? "" : "disabled"}>
+        PRESTIGE
+      </button>
     </div>
+
     <div class="upgrade-card">
       <h3 style="color:#ef4444">EVIL PRESTIGE</h3>
-      <p>Evil rewards. Much harder resets. Powerful new mechanics.</p>
-      <p>Evil prestige count: ${game.evilPrestigeCount}</p>
-      <button disabled>LOCKED</button>
+
+      <p>A much more powerful reset system.</p>
+      <p>Evil Prestige count: ${game.evilPrestigeCount}</p>
+
+      <button disabled>COMING SOON</button>
     </div>
   `;
+
+  document.getElementById("prestigeButton")
+    .addEventListener("click", doPrestige);
 }
 
 function renderStats(content) {
   content.innerHTML = `
     <h2>Statistics</h2>
+
     <p>Total clicks: ${format(game.totalClicks)}</p>
+
     <p>Unlocked eras: ${game.unlocked.length}/5</p>
+
     <p>Purchased upgrades: ${game.upgrades.length}</p>
+
     <p>Normal prestiges: ${game.prestigeCount}</p>
+
+    <p>Prestige Points: ${format(game.prestigePoints)}</p>
+
+    <p>Permanent multiplier: x${getPrestigeMultiplier().toFixed(2)}</p>
+
     <p>Evil prestiges: ${game.evilPrestigeCount}</p>
+
     <br>
     <h3>Lifetime Currency</h3>
+
     ${ERAS.map(era => `
       <p>${era.name}: ${format(game.lifetime[era.id] || 0)}</p>
     `).join("")}
@@ -417,10 +555,10 @@ function updateUI() {
   renderTab();
 }
 
-document.getElementById("generate").addEventListener(
-  "click",
-  generateEnergy
-);
+// EVENT LISTENERS
+
+document.getElementById("generate")
+  .addEventListener("click", generateEnergy);
 
 document.querySelectorAll("nav button").forEach(button => {
   button.addEventListener("click", () => {
@@ -429,8 +567,12 @@ document.querySelectorAll("nav button").forEach(button => {
   });
 });
 
+// START GAME
+
 loadGame();
 updateUI();
+
+// AUTOMATIC PRODUCTION
 
 setInterval(() => {
   ERAS.filter(era => game.unlocked.includes(era.id))
@@ -444,6 +586,8 @@ setInterval(() => {
 
   updateUI();
 }, 1000);
+
+// AUTOSAVE
 
 setInterval(saveGame, 5000);
 
