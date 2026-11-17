@@ -1,484 +1,942 @@
 
-const SAVE_KEY = "exponent_save_v3";
+/* =========================================================
+   EXPONENT — MASSIVE CONTENT UPDATE
+   400 upgrades, 5 currencies, generators, prestige,
+   evil prestige, achievements, challenges, offline progress.
+   ========================================================= */
+
+"use strict";
+
+const SAVE_KEY = "exponent_save_v5";
 
 const ERAS = [
   {
     id: "energy",
     name: "Energy",
-    color: "#a78bfa",
-    generatorCost: 10,
-    generatorGrowth: 1.15,
-    generatorPower: 1,
-    upgradeCost: 50,
-    upgradePower: 2,
-    nextCost: 1000,
-    nextName: "Matter"
+    symbol: "⚡",
+    generator: "Energy Generator",
+    baseCost: 10,
+    unlockCost: 1000000,
+    color: "#66d9ff"
   },
   {
     id: "matter",
     name: "Matter",
-    color: "#60a5fa",
-    generatorCost: 25,
-    generatorGrowth: 1.18,
-    generatorPower: 2,
-    upgradeCost: 150,
-    upgradePower: 3,
-    nextCost: 2500,
-    nextName: "Quantum"
+    symbol: "◆",
+    generator: "Matter Extractor",
+    baseCost: 100,
+    unlockCost: 1000000,
+    color: "#b58cff"
   },
   {
     id: "quantum",
     name: "Quantum",
-    color: "#c084fc",
-    generatorCost: 50,
-    generatorGrowth: 1.20,
-    generatorPower: 5,
-    upgradeCost: 300,
-    upgradePower: 4,
-    nextCost: 5000,
-    nextName: "Singularity"
+    symbol: "◈",
+    generator: "Quantum Reactor",
+    baseCost: 1000,
+    unlockCost: 1000000,
+    color: "#ff80c8"
   },
   {
     id: "singularity",
     name: "Singularity",
-    color: "#f472b6",
-    generatorCost: 100,
-    generatorGrowth: 1.22,
-    generatorPower: 10,
-    upgradeCost: 600,
-    upgradePower: 5,
-    nextCost: 10000,
-    nextName: "Eternity"
+    symbol: "●",
+    generator: "Singularity Engine",
+    baseCost: 10000,
+    unlockCost: 1000000,
+    color: "#ffad66"
   },
   {
     id: "eternity",
     name: "Eternity",
-    color: "#fbbf24",
-    generatorCost: 250,
-    generatorGrowth: 1.25,
-    generatorPower: 25,
-    upgradeCost: 1200,
-    upgradePower: 10
+    symbol: "∞",
+    generator: "Eternity Core",
+    baseCost: 100000,
+    unlockCost: null,
+    color: "#ffe66d"
   }
 ];
 
-function createDefaultSave() {
-  const currencies = {};
-  const generators = {};
+const UPGRADE_PREFIXES = [
+  "Improved",
+  "Advanced",
+  "Enhanced",
+  "Unstable",
+  "Efficient",
+  "Experimental",
+  "Overcharged",
+  "Refined",
+  "Accelerated",
+  "Transcendent",
+  "Hyper",
+  "Infinite",
+  "Perfect",
+  "Extreme",
+  "Quantum",
+  "Cosmic",
+  "Dimensional",
+  "Absolute",
+  "Eternal",
+  "Ultimate"
+];
 
-  ERAS.forEach(era => {
-    currencies[era.id] = 0;
-    generators[era.id] = 0;
-  });
+const UPGRADE_NAMES = [
+  "Production",
+  "Generators",
+  "Efficiency",
+  "Compression",
+  "Expansion",
+  "Amplification",
+  "Conversion",
+  "Resonance",
+  "Stability",
+  "Acceleration",
+  "Power",
+  "Density",
+  "Replication",
+  "Optimization",
+  "Synchronization",
+  "Overclocking",
+  "Processing",
+  "Collection",
+  "Distortion",
+  "Reconstruction"
+];
 
+const ACHIEVEMENTS = [
+  ["First Spark", "Generate your first 10 Energy.", "energy", 10],
+  ["Getting Started", "Reach 100 Energy.", "energy", 100],
+  ["Power Plant", "Reach 10,000 Energy.", "energy", 10000],
+  ["Energy Addict", "Reach 1 million Energy.", "energy", 1e6],
+  ["Matter Matters", "Reach 100 Matter.", "matter", 100],
+  ["Matter Master", "Reach 100,000 Matter.", "matter", 1e5],
+  ["Quantum Leap", "Reach 100 Quantum.", "quantum", 100],
+  ["Quantum Storm", "Reach 100,000 Quantum.", "quantum", 1e5],
+  ["Singularity", "Reach 100 Singularity.", "singularity", 100],
+  ["Beyond Reality", "Reach 100,000 Singularity.", "singularity", 1e5],
+  ["Forever", "Reach 100 Eternity.", "eternity", 100],
+  ["Endless", "Reach 100,000 Eternity.", "eternity", 1e5],
+  ["First Generator", "Own 10 generators.", "generators", 10],
+  ["Factory", "Own 100 generators.", "generators", 100],
+  ["Industrial", "Own 500 generators.", "generators", 500],
+  ["Upgrade Beginner", "Buy 10 upgrades.", "upgrades", 10],
+  ["Upgrade Expert", "Buy 50 upgrades.", "upgrades", 50],
+  ["Upgrade Collector", "Buy 100 upgrades.", "upgrades", 100],
+  ["Upgrade Maniac", "Buy 200 upgrades.", "upgrades", 200],
+  ["Upgrade Legend", "Buy all 400 upgrades.", "upgrades", 400],
+  ["First Reset", "Perform your first Prestige.", "prestige", 1],
+  ["Experienced", "Perform 10 Prestiges.", "prestige", 10],
+  ["Evil Begins", "Perform your first Evil Prestige.", "evil", 1],
+  ["Dark Power", "Earn 100 Evil Shards.", "shards", 100],
+  ["Clicker", "Click 1,000 times.", "clicks", 1000],
+  ["Dedicated", "Play for 1 hour.", "time", 3600],
+  ["Challenge Accepted", "Complete a challenge.", "challenges", 1],
+  ["Challenge Master", "Complete all challenges.", "challenges", 3]
+];
+
+const CHALLENGES = [
+  {
+    id: "slow",
+    name: "Slow Universe",
+    description: "Generator production is reduced. Complete the challenge by reaching 10,000 Energy.",
+    target: 10000,
+    reward: "Permanent +10% production",
+    multiplier: 0.5
+  },
+  {
+    id: "expensive",
+    name: "Inflation",
+    description: "Generators cost more. Reach 100,000 Energy.",
+    target: 100000,
+    reward: "Permanent +20% production",
+    multiplier: 1
+  },
+  {
+    id: "click",
+    name: "Manual Labor",
+    description: "Generators are disabled. Reach 5,000 Energy through clicking.",
+    target: 5000,
+    reward: "Permanent +30% clicking power",
+    multiplier: 1
+  }
+];
+
+function freshSave() {
   return {
-    currencies,
-    generators,
+    version: 5,
+
+    currencies: {
+      energy: 0,
+      matter: 0,
+      quantum: 0,
+      singularity: 0,
+      eternity: 0
+    },
+
+    lifetime: {
+      energy: 0,
+      matter: 0,
+      quantum: 0,
+      singularity: 0,
+      eternity: 0
+    },
+
+    generators: {
+      energy: 0,
+      matter: 0,
+      quantum: 0,
+      singularity: 0,
+      eternity: 0
+    },
+
     unlocked: ["energy"],
     upgrades: [],
-    lifetime: {},
-    runLifetime: {},
-    totalClicks: 0,
-    prestigeCount: 0,
+    achievements: [],
+    completedChallenges: [],
+
     prestigePoints: 0,
-    evilPrestigeCount: 0
+    prestigeCount: 0,
+
+    evilShards: 0,
+    evilPrestigeCount: 0,
+
+    clicks: 0,
+    totalGeneratorsBought: 0,
+    totalPlaytime: 0,
+
+    activeChallenge: null,
+    challengeProgress: 0,
+
+    lastSave: Date.now()
   };
 }
 
-let game = createDefaultSave();
-let currentTab = "main";
+let game = freshSave();
+let activeTab = "main";
+let lastTick = Date.now();
+let toastTimer = null;
 
-function format(value) {
-  if (!Number.isFinite(value)) return "Infinity";
-  if (value < 1000) return Math.floor(value).toString();
-
-  if (value >= 1e15) {
-    return value.toExponential(2);
-  }
-
-  const suffixes = [
-    "K", "M", "B", "T",
-    "Qa", "Qi", "Sx", "Sp"
-  ];
-
-  let tier = -1;
-
-  while (value >= 1000 && tier < suffixes.length - 1) {
-    value /= 1000;
-    tier++;
-  }
-
-  if (value >= 1000) return value.toExponential(2);
-
-  return value.toFixed(2) + suffixes[tier];
-}
-
+// ---------------------------------------------------------
 // SAVE SYSTEM
+// ---------------------------------------------------------
 
 function loadGame() {
   try {
-    const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+    const raw = localStorage.getItem(SAVE_KEY);
 
-    if (!saved) return;
+    if (!raw) return;
 
-    const defaults = createDefaultSave();
+    const saved = JSON.parse(raw);
+    const defaults = freshSave();
 
     game = {
       ...defaults,
       ...saved,
+
       currencies: {
         ...defaults.currencies,
         ...(saved.currencies || {})
       },
+
+      lifetime: {
+        ...defaults.lifetime,
+        ...(saved.lifetime || {})
+      },
+
       generators: {
         ...defaults.generators,
         ...(saved.generators || {})
-      },
-      lifetime: saved.lifetime || {},
-      runLifetime: saved.runLifetime || {},
-      unlocked: saved.unlocked || ["energy"],
-      upgrades: saved.upgrades || []
+      }
     };
 
+    game.unlocked ||= ["energy"];
+    game.upgrades ||= [];
+    game.achievements ||= [];
+    game.completedChallenges ||= [];
   } catch (error) {
-    console.log("Could not load save.");
+    console.error("Save loading failed:", error);
+    game = freshSave();
   }
 }
 
 function saveGame() {
-  localStorage.setItem(
-    SAVE_KEY,
-    JSON.stringify(game)
+  game.lastSave = Date.now();
+
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(game));
+  } catch (error) {
+    console.error("Save failed:", error);
+  }
+}
+
+function showToast(message) {
+  let toast = document.getElementById("game-toast");
+
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "game-toast";
+
+    Object.assign(toast.style, {
+      position: "fixed",
+      bottom: "25px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "#272744",
+      color: "white",
+      padding: "12px 18px",
+      borderRadius: "12px",
+      zIndex: "9999",
+      maxWidth: "90%",
+      textAlign: "center",
+      boxShadow: "0 5px 25px #0008"
+    });
+
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.style.display = "block";
+
+  clearTimeout(toastTimer);
+
+  toastTimer = setTimeout(() => {
+    toast.style.display = "none";
+  }, 2500);
+}
+
+// ---------------------------------------------------------
+// NUMBER FORMATTING
+// ---------------------------------------------------------
+
+function format(value) {
+  if (!Number.isFinite(value)) return "∞";
+
+  if (Math.abs(value) < 1000) {
+    return value.toFixed(value < 10 && value % 1 ? 2 : 0);
+  }
+
+  const suffixes = [
+    "", "K", "M", "B", "T", "Qa",
+    "Qi", "Sx", "Sp", "Oc", "No", "Dc"
+  ];
+
+  const tier = Math.floor(Math.log10(Math.abs(value)) / 3);
+
+  if (tier >= suffixes.length) {
+    return value.toExponential(2);
+  }
+
+  return (
+    (value / Math.pow(1000, tier)).toFixed(2) +
+    suffixes[tier]
   );
 }
 
-// CURRENCY SYSTEM
-
-function getActiveEra() {
-  return [...ERAS].reverse().find(
-    era => game.unlocked.includes(era.id)
-  ) || ERAS[0];
+function getEra(id) {
+  return ERAS.find(era => era.id === id);
 }
 
-function getMultiplier(era) {
-  return game.upgrades.includes(era.id + "_boost")
-    ? era.upgradePower
-    : 1;
+function highestEraIndex() {
+  let index = 0;
+
+  ERAS.forEach((era, i) => {
+    if (game.unlocked.includes(era.id)) index = i;
+  });
+
+  return index;
+}
+
+function activeEra() {
+  return ERAS[highestEraIndex()];
+}
+
+// ---------------------------------------------------------
+// 400 UPGRADE GENERATOR
+// ---------------------------------------------------------
+
+const ALL_UPGRADES = [];
+
+ERAS.forEach((era, eraIndex) => {
+  for (let i = 0; i < 80; i++) {
+    const prefix = UPGRADE_PREFIXES[
+      Math.floor(i / 4) % UPGRADE_PREFIXES.length
+    ];
+
+    const name = UPGRADE_NAMES[
+      (i + eraIndex * 3) % UPGRADE_NAMES.length
+    ];
+
+    const number = i + 1;
+
+    let type = "production";
+    let effect = 1.08 + (i % 8) * 0.025;
+
+    if (i % 10 === 4) {
+      type = "global";
+      effect = 1.02 + (i % 5) * 0.01;
+    }
+
+    if (i % 10 === 7) {
+      type = "click";
+      effect = 1.15 + (i % 5) * 0.05;
+    }
+
+    if (i % 10 === 9) {
+      type = "generator";
+      effect = 1.1 + (i % 5) * 0.05;
+    }
+
+    ALL_UPGRADES.push({
+      id: era.id + "_upgrade_" + number,
+      era: era.id,
+      eraIndex,
+      number,
+      name: prefix + " " + name + " " + number,
+      type,
+      effect,
+      cost: era.baseCost * 10 * Math.pow(1.55, i),
+      description: getUpgradeDescription(type, effect)
+    });
+  }
+});
+
+function getUpgradeDescription(type, effect) {
+  const percent = Math.round((effect - 1) * 100);
+
+  if (type === "global") {
+    return "Increase all production by " + percent + "%.";
+  }
+
+  if (type === "click") {
+    return "Increase clicking power by " + percent + "%.";
+  }
+
+  if (type === "generator") {
+    return "Increase generator production by " + percent + "%.";
+  }
+
+  return "Increase this currency's production by " + percent + "%.";
+}
+
+function upgradeOwned(id) {
+  return game.upgrades.includes(id);
+}
+
+function buyUpgrade(id) {
+  const upgrade = ALL_UPGRADES.find(item => item.id === id);
+
+  if (!upgrade || upgradeOwned(id)) return;
+
+  if (!game.unlocked.includes(upgrade.era)) {
+    showToast("Unlock this currency first!");
+    return;
+  }
+
+  if (game.currencies[upgrade.era] < upgrade.cost) {
+    showToast("Not enough " + getEra(upgrade.era).name + "!");
+    return;
+  }
+
+  game.currencies[upgrade.era] -= upgrade.cost;
+  game.upgrades.push(id);
+
+  showToast("Purchased: " + upgrade.name);
+
+  checkAchievements();
+  saveGame();
+  render();
+}
+
+// ---------------------------------------------------------
+// PRODUCTION
+// ---------------------------------------------------------
+
+function getUpgradeMultiplier(eraId, type) {
+  let multiplier = 1;
+
+  ALL_UPGRADES.forEach(upgrade => {
+    if (!upgradeOwned(upgrade.id)) return;
+
+    if (type === "global" && upgrade.type === "global") {
+      multiplier *= upgrade.effect;
+    }
+
+    if (upgrade.era === eraId && upgrade.type === type) {
+      multiplier *= upgrade.effect;
+    }
+  });
+
+  return multiplier;
 }
 
 function getPrestigeMultiplier() {
-  return 1 + game.prestigePoints * 0.1;
+  return (
+    1 +
+    game.prestigePoints * 0.1 +
+    game.evilShards * 0.25
+  );
 }
 
-function getProduction(era) {
-  return game.generators[era.id] *
-    era.generatorPower *
-    getMultiplier(era) *
-    getPrestigeMultiplier();
-}
+function getChallengeMultiplier() {
+  if (!game.activeChallenge) return 1;
 
-function earnCurrency(id, amount) {
-  game.currencies[id] += amount;
-
-  game.lifetime[id] =
-    (game.lifetime[id] || 0) + amount;
-
-  game.runLifetime[id] =
-    (game.runLifetime[id] || 0) + amount;
-}
-
-function generateEnergy() {
-  const era = getActiveEra();
-
-  earnCurrency(
-    era.id,
-    getMultiplier(era) * getPrestigeMultiplier()
+  const challenge = CHALLENGES.find(
+    item => item.id === game.activeChallenge
   );
 
-  game.totalClicks++;
-
-  updateUI();
-  saveGame();
+  return challenge ? challenge.multiplier : 1;
 }
 
+function productionFor(eraId) {
+  const count = game.generators[eraId] || 0;
+
+  let production = count;
+
+  production *= getUpgradeMultiplier(eraId, "production");
+  production *= getUpgradeMultiplier(eraId, "generator");
+  production *= getUpgradeMultiplier("all", "global");
+  production *= getPrestigeMultiplier();
+
+  if (game.activeChallenge === "slow") {
+    production *= 0.5;
+  }
+
+  if (game.activeChallenge === "click") {
+    production = 0;
+  }
+
+  return production;
+}
+
+function totalProduction() {
+  let total = 0;
+
+  ERAS.forEach(era => {
+    if (game.unlocked.includes(era.id)) {
+      total += productionFor(era.id);
+    }
+  });
+
+  return total;
+}
+
+function generateClick() {
+  const era = activeEra();
+
+  let amount = 1;
+
+  amount *= getUpgradeMultiplier(era.id, "click");
+  amount *= getPrestigeMultiplier();
+
+  if (game.activeChallenge === "slow") {
+    amount *= 0.5;
+  }
+
+  if (game.activeChallenge === "click") {
+    amount *= 2;
+  }
+
+  game.currencies[era.id] += amount;
+  game.lifetime[era.id] += amount;
+
+  game.clicks++;
+
+  checkChallenge();
+  checkAchievements();
+  render();
+}
+
+// ---------------------------------------------------------
 // GENERATORS
+// ---------------------------------------------------------
 
-function getGeneratorCost(era) {
-  return Math.ceil(
-    era.generatorCost *
-    Math.pow(
-      era.generatorGrowth,
-      game.generators[era.id]
-    )
-  );
+function generatorCost(eraId) {
+  const era = getEra(eraId);
+  const count = game.generators[eraId];
+
+  let cost = era.baseCost * Math.pow(1.17, count);
+
+  if (game.activeChallenge === "expensive") {
+    cost *= 3;
+  }
+
+  return cost;
 }
 
-function buyGenerator(id) {
-  const era = ERAS.find(item => item.id === id);
+function buyGenerator(eraId) {
+  if (!game.unlocked.includes(eraId)) return;
 
-  if (!era) return;
+  if (game.activeChallenge === "click") {
+    showToast("Generators are disabled in this challenge!");
+    return;
+  }
 
-  const cost = getGeneratorCost(era);
+  const cost = generatorCost(eraId);
 
-  if (game.currencies[id] < cost) return;
+  if (game.currencies[eraId] < cost) {
+    showToast("Not enough currency!");
+    return;
+  }
 
-  game.currencies[id] -= cost;
-  game.generators[id]++;
+  game.currencies[eraId] -= cost;
+  game.generators[eraId]++;
+  game.totalGeneratorsBought++;
 
-  updateUI();
+  showToast("Generator purchased!");
+
+  checkAchievements();
   saveGame();
+  render();
 }
 
-// UPGRADES
+function buyMaxGenerators(eraId) {
+  let bought = 0;
 
-function buyUpgrade(id) {
-  const era = ERAS.find(item => item.id === id);
+  for (let i = 0; i < 1000; i++) {
+    const cost = generatorCost(eraId);
 
-  if (!era) return;
+    if (game.currencies[eraId] < cost) break;
 
-  const upgradeId = id + "_boost";
+    game.currencies[eraId] -= cost;
+    game.generators[eraId]++;
+    game.totalGeneratorsBought++;
 
-  if (game.upgrades.includes(upgradeId)) return;
-  if (game.currencies[id] < era.upgradeCost) return;
+    bought++;
+  }
 
-  game.currencies[id] -= era.upgradeCost;
-  game.upgrades.push(upgradeId);
-
-  updateUI();
-  saveGame();
+  if (bought > 0) {
+    showToast("Bought " + bought + " generators!");
+    checkAchievements();
+    saveGame();
+    render();
+  } else {
+    showToast("Not enough currency!");
+  }
 }
 
+// ---------------------------------------------------------
 // CURRENCY MILESTONES
+// ---------------------------------------------------------
 
-function unlockEra(id) {
-  const index = ERAS.findIndex(item => item.id === id);
-  const era = ERAS[index];
+function unlockNextEra() {
+  const index = highestEraIndex();
+  const next = ERAS[index + 1];
 
-  if (!era || !era.nextName) return;
+  if (!next) return;
 
-  const nextEra = ERAS[index + 1];
+  const current = ERAS[index];
 
-  if (!nextEra) return;
-  if (game.unlocked.includes(nextEra.id)) return;
-  if (game.currencies[id] < era.nextCost) return;
+  if (game.currencies[current.id] < next.unlockCost) {
+    showToast("Not enough " + current.name + "!");
+    return;
+  }
 
-  game.currencies[id] -= era.nextCost;
+  game.currencies[current.id] -= next.unlockCost;
+  game.unlocked.push(next.id);
 
-  game.upgrades.push(id + "_milestone");
-  game.unlocked.push(nextEra.id);
+  showToast(next.name + " unlocked!");
 
-  updateUI();
   saveGame();
+  render();
 }
 
-// PRESTIGE SYSTEM
+// ---------------------------------------------------------
+// PRESTIGE
+// ---------------------------------------------------------
 
-function getPrestigeReward() {
-  const lifetimeEnergy = game.runLifetime.energy || 0;
-
+function prestigeReward() {
   return Math.floor(
-    Math.sqrt(lifetimeEnergy / 1000000)
+    Math.sqrt(game.lifetime.energy / 1000000)
   );
-}
-
-function canPrestige() {
-  return getPrestigeReward() >= 1;
 }
 
 function doPrestige() {
-  if (!canPrestige()) return;
+  const reward = prestigeReward();
 
-  const reward = getPrestigeReward();
+  if (reward < 1) {
+    showToast("You need more lifetime Energy!");
+    return;
+  }
 
-  const lifetime = { ...game.lifetime };
-  const totalClicks = game.totalClicks;
-  const prestigePoints = game.prestigePoints + reward;
-  const prestigeCount = game.prestigeCount + 1;
-  const evilPrestigeCount = game.evilPrestigeCount;
+  if (!confirm(
+    "Prestige for " + reward +
+    " Prestige Points? Your ordinary progress will reset."
+  )) return;
 
-  const fresh = createDefaultSave();
+  game.prestigePoints += reward;
+  game.prestigeCount++;
 
-  game = {
-    ...fresh,
-    lifetime,
-    totalClicks,
-    prestigePoints,
-    prestigeCount,
-    evilPrestigeCount
-  };
+  resetRun();
 
-  currentTab = "prestige";
+  showToast("Prestige complete! +" + reward + " points.");
 
-  updateUI();
+  checkAchievements();
   saveGame();
+  render();
 }
 
-// INTERFACE
+function evilPrestigeReward() {
+  if (game.prestigePoints < 100) return 0;
+  if (game.currencies.eternity < 1000000) return 0;
 
-function renderCurrencyHeader() {
-  const era = getActiveEra();
-
-  document.querySelector("#currency p").textContent =
-    era.name.toUpperCase();
-
-  document.getElementById("energy").textContent =
-    format(game.currencies[era.id]);
-
-  document.getElementById("production").textContent =
-    "+" + format(getProduction(era)) + " / second";
-
-  document.getElementById("currency").style.borderColor =
-    era.color;
+  return Math.max(
+    1,
+    Math.floor(Math.sqrt(game.prestigePoints / 100))
+  );
 }
 
-function renderMain(content) {
-  content.innerHTML = `
-    <h2>Universe Overview</h2>
+function doEvilPrestige() {
+  const reward = evilPrestigeReward();
 
-    <p>Your universe is expanding. Discover new currencies
-    and build increasingly powerful generators.</p>
+  if (reward < 1) {
+    showToast(
+      "Requires 100 Prestige Points and 1M Eternity!"
+    );
+    return;
+  }
 
-    <br>
-    <h3>Unlocked Currencies</h3>
+  if (!confirm(
+    "Perform EVIL PRESTIGE for " +
+    reward + " Evil Shards?"
+  )) return;
 
-    ${ERAS.filter(era => game.unlocked.includes(era.id))
-      .map(era => `
-        <div class="upgrade-card">
-          <h3 style="color:${era.color}">
-            ${era.name}
-          </h3>
-          <p>Amount: ${format(game.currencies[era.id])}</p>
-          <p>Production: +${format(getProduction(era))}/s</p>
-          <p>Generators: ${game.generators[era.id]}</p>
-        </div>
-      `).join("")}
-  `;
+  game.evilShards += reward;
+  game.evilPrestigeCount++;
+
+  game.prestigePoints = 0;
+  game.prestigeCount = 0;
+
+  resetRun();
+
+  showToast("EVIL PRESTIGE! +" + reward + " Evil Shards.");
+
+  checkAchievements();
+  saveGame();
+  render();
 }
 
-function renderGenerators(content) {
-  content.innerHTML = `
-    <h2>Generators</h2>
-    <p>Build generators to produce currencies automatically.</p>
+function resetRun() {
+  ERAS.forEach(era => {
+    game.currencies[era.id] = 0;
+    game.generators[era.id] = 0;
+  });
 
-    ${ERAS.filter(era => game.unlocked.includes(era.id))
-      .map(era => {
-        const cost = getGeneratorCost(era);
+  game.unlocked = ["energy"];
+  game.upgrades = [];
+  game.activeChallenge = null;
+  game.challengeProgress = 0;
+}
 
-        return `
-          <div class="upgrade-card">
-            <h3 style="color:${era.color}">
-              ${era.name} Generator
-            </h3>
+// ---------------------------------------------------------
+// CHALLENGES
+// ---------------------------------------------------------
 
-            <p>Owned: ${game.generators[era.id]}</p>
+function startChallenge(id) {
+  const challenge = CHALLENGES.find(item => item.id === id);
 
-            <p>Produces:
-              ${format(
-                era.generatorPower *
-                getMultiplier(era) *
-                getPrestigeMultiplier()
-              )} ${era.name}/second
-            </p>
+  if (!challenge) return;
 
-            <p>Cost: ${format(cost)} ${era.name}</p>
+  if (game.completedChallenges.includes(id)) {
+    showToast("Challenge already completed!");
+    return;
+  }
 
-            <button
-              data-generator="${era.id}"
-              ${game.currencies[era.id] < cost ? "disabled" : ""}>
-              BUY GENERATOR
-            </button>
-          </div>
-        `;
-      }).join("")}
-  `;
+  if (game.activeChallenge) {
+    showToast("Finish or exit your current challenge first.");
+    return;
+  }
 
-  content.querySelectorAll("[data-generator]").forEach(button => {
-    button.addEventListener("click", () => {
-      buyGenerator(button.dataset.generator);
-    });
+  if (!confirm("Start " + challenge.name + "?")) return;
+
+  resetRun();
+
+  game.activeChallenge = id;
+  game.challengeProgress = 0;
+
+  showToast("Challenge started: " + challenge.name);
+
+  saveGame();
+  render();
+}
+
+function exitChallenge() {
+  if (!game.activeChallenge) return;
+
+  if (!confirm("Exit this challenge? Your challenge run will reset.")) {
+    return;
+  }
+
+  game.activeChallenge = null;
+  game.challengeProgress = 0;
+
+  resetRun();
+
+  saveGame();
+  render();
+}
+
+function checkChallenge() {
+  if (!game.activeChallenge) return;
+
+  const challenge = CHALLENGES.find(
+    item => item.id === game.activeChallenge
+  );
+
+  if (!challenge) return;
+
+  const progress = game.currencies.energy;
+
+  game.challengeProgress = progress;
+
+  if (progress >= challenge.target) {
+    game.completedChallenges.push(challenge.id);
+    game.activeChallenge = null;
+
+    showToast("Challenge completed: " + challenge.name + "!");
+
+    checkAchievements();
+    saveGame();
+  }
+}
+
+// ---------------------------------------------------------
+// ACHIEVEMENTS
+// ---------------------------------------------------------
+
+function achievementProgress(type) {
+  switch (type) {
+    case "energy":
+    case "matter":
+    case "quantum":
+    case "singularity":
+    case "eternity":
+      return game.lifetime[type];
+
+    case "generators":
+      return game.totalGeneratorsBought;
+
+    case "upgrades":
+      return game.upgrades.length;
+
+    case "prestige":
+      return game.prestigeCount;
+
+    case "evil":
+      return game.evilPrestigeCount;
+
+    case "shards":
+      return game.evilShards;
+
+    case "clicks":
+      return game.clicks;
+
+    case "time":
+      return game.totalPlaytime;
+
+    case "challenges":
+      return game.completedChallenges.length;
+
+    default:
+      return 0;
+  }
+}
+
+function checkAchievements() {
+  ACHIEVEMENTS.forEach((achievement, index) => {
+    const [name, description, type, target] = achievement;
+
+    if (game.achievements.includes(index)) return;
+
+    if (achievementProgress(type) >= target) {
+      game.achievements.push(index);
+      showToast("Achievement unlocked: " + name + "!");
+    }
   });
 }
 
-function renderUpgrades(content) {
-  content.innerHTML = `
-    <h2>Upgrade Center</h2>
-    <p>Improve your production and discover new currencies.</p>
+// ---------------------------------------------------------
+// OFFLINE PROGRESS
+// ---------------------------------------------------------
 
-    ${ERAS.filter(era => game.unlocked.includes(era.id))
-      .map((era, index) => {
-        const upgradeId = era.id + "_boost";
-        const purchased = game.upgrades.includes(upgradeId);
-        const nextEra = ERAS[index + 1];
+function applyOfflineProgress() {
+  if (!game.lastSave) return;
 
-        const nextUnlocked = nextEra &&
-          game.unlocked.includes(nextEra.id);
+  const seconds = Math.min(
+    28800,
+    Math.max(0, (Date.now() - game.lastSave) / 1000)
+  );
 
-        return `
-          <div class="upgrade-card">
-            <h3 style="color:${era.color}">
-              ${era.name} Optimization
-            </h3>
+  if (seconds < 5) return;
 
-            <p>Multiply ${era.name} production by x${era.upgradePower}.</p>
-            <p>Cost: ${format(era.upgradeCost)} ${era.name}</p>
+  if (game.activeChallenge) return;
 
-            <button
-              data-upgrade="${era.id}"
-              ${purchased || game.currencies[era.id] < era.upgradeCost ? "disabled" : ""}>
-              ${purchased ? "PURCHASED" : "BUY UPGRADE"}
-            </button>
-          </div>
+  let earned = 0;
 
-          ${era.nextName ? `
-            <div class="upgrade-card">
-              <h3>Milestone: ${era.nextName} Discovery</h3>
+  ERAS.forEach(era => {
+    if (!game.unlocked.includes(era.id)) return;
 
-              <p>Unlock ${era.nextName} and its generators.</p>
-              <p>Cost: ${format(era.nextCost)} ${era.name}</p>
+    const amount = productionFor(era.id) * seconds;
 
-              <button
-                data-milestone="${era.id}"
-                ${nextUnlocked || game.currencies[era.id] < era.nextCost ? "disabled" : ""}>
-                ${nextUnlocked ? "UNLOCKED" : "DISCOVER " + era.nextName.toUpperCase()}
-              </button>
-            </div>
-          ` : ""}
-        `;
-      }).join("")}
-  `;
+    game.currencies[era.id] += amount;
+    game.lifetime[era.id] += amount;
 
-  content.querySelectorAll("[data-upgrade]").forEach(button => {
-    button.addEventListener("click", () => {
-      buyUpgrade(button.dataset.upgrade);
-    });
+    earned += amount;
   });
 
-  content.querySelectorAll("[data-milestone]").forEach(button => {
-    button.addEventListener("click", () => {
-      unlockEra(button.dataset.milestone);
-    });
+  if (earned > 0) {
+    showToast(
+      "Welcome back! You earned " +
+      format(earned) + " resources offline."
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// UI HELPERS
+// ---------------------------------------------------------
+
+function addTabs() {
+  const nav = document.querySelector("nav");
+
+  if (!nav) return;
+
+  const extraTabs = [
+    ["achievements", "Achievements"],
+    ["challenges", "Challenges"]
+  ];
+
+  extraTabs.forEach(([id, label]) => {
+    if (nav.querySelector('[data-tab="' + id + '"]')) return;
+
+    const button = document.createElement("button");
+
+    button.dataset.tab = id;
+    button.textContent = label;
+
+    nav.appendChild(button);
   });
 }
 
-function renderPrestige(content) {
-  const reward = getPrestigeReward();
+function card(title, body, footer = "") {
+  return `
+    <div class="upgrade-card" style="
+      background:#17172b;
+      border:1px solid #30304b;
+      border-radius:14px;
+      padding:15px;
+      margin:10px 0;
+    ">
+      <h3>${title}</h3>
+      <p>${body}</p>
+      ${footer}
+    </div>
+  `;
+}
 
-  content.innerHTML = `
-    <h2>Prestige</h2>
-
-    <div class="upgrade-card">
-      <h3>Normal Prestige</h3>
-
-      <p>Prestige Points: ${format(game.prestigePoints)}</p>
-
-      <p>Permanent production multiplier:
-        x${getPrestigeMultiplier().toFixed(2)}
-      </p>
-
-      <p>Run lifetime Energy:
-        ${format(game.runLifetime.energy || 0)}
-      </p>
-
-      <p>Required: 1,000,000 lifetime Energy</p>
-
-      <p>Available reward:
+function actionButton(label, action, disabled = false) {
+  return `
+    <button
+      data-action="${action}"
+      ${disabled ? "disabled" : ""}
+      style="
+        width:100
