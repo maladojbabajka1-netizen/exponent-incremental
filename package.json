@@ -1,3 +1,4 @@
+
 {
   "name": "exponent-incremental",
   "version": "1.0.0",
@@ -5,13 +6,36 @@
   "description": "EXPONENT - An incremental game",
   "scripts": {
     "build": "echo Building EXPONENT",
-    "cap:init": "cap init EXPONENT com.exponent.incremental",
-    "cap:sync": "cap sync"
+    "cap:sync": "cap sync",
+    "desktop": "electron .",
+    "package:desktop": "electron-builder"
   },
   "dependencies": {
     "@capacitor/core": "^7.4.3"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.3"
+    "@capacitor/cli": "^7.4.3",
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.exponent.incremental",
+    "productName": "EXPONENT",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "www/**/*",
+      "electron.js"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
